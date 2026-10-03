@@ -1,17 +1,13 @@
 import json
 import os
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from lib.mongodb import get_collection
 from lib.ollama_client import chat
 from lib.vector_search import RetrievedDocument, search_relevant_documents
 
-mcp = FastMCP(
-    "docs-mcp",
-    host=os.environ.get("MCP_HOST", "0.0.0.0"),
-    port=int(os.environ.get("MCP_PORT", "8000")),
-)
+mcp = MCPServer("docs-mcp")
 
 RAG_PROMPT = (
     "You are a very enthusiastic freeCodeCamp.org representative who loves to help people! "
@@ -58,4 +54,11 @@ def ask_about_docs(query: str) -> str:
 
 if __name__ == "__main__":
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
-    mcp.run(transport=transport)
+    if transport == "stdio":
+        mcp.run(transport="stdio")
+    else:
+        mcp.run(
+            transport=transport,
+            host=os.environ.get("MCP_HOST", "0.0.0.0"),
+            port=int(os.environ.get("MCP_PORT", "8000")),
+        )

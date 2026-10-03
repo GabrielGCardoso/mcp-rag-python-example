@@ -84,29 +84,20 @@ Copie [`.env.example`](.env.example) para `.env` se rodar fora do Compose.
 
 ## Testar com curl (opcional)
 
+O servidor usa o SDK Python 2 (`mcp>=2,<3`). O exemplo abaixo é a revisão 2026-07-28: um POST, sem `initialize` e sem `Mcp-Session-Id`. A versão vai no header `MCP-Protocol-Version` e em `_meta`. O índice fica no Mongo, então a tool não carrega estado de sessão.
+
 Com `docker compose up -d` e indexação feita:
 
 ```bash
 MCP=http://localhost:8000/mcp
 
-curl -s -D /tmp/mcp-h.txt -X POST "$MCP" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}},"id":1}'
-
-SESSION=$(grep -i mcp-session-id /tmp/mcp-h.txt | awk '{print $2}' | tr -d '\r')
-
 curl -s -X POST "$MCP" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
-  -H "Mcp-Session-Id: $SESSION" \
-  -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-
-curl -s -X POST "$MCP" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Mcp-Session-Id: $SESSION" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"search_docs","arguments":{"query":"How do I open a pull request?","k":4}},"id":3}'
+  -H "MCP-Protocol-Version: 2026-07-28" \
+  -H "Mcp-Method: tools/call" \
+  -H "Mcp-Name: search_docs" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_docs","arguments":{"query":"How do I open a pull request?","k":4},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"curl","version":"1.0"}}}}'
 ```
 
 ## Estrutura
