@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Indexa as fontes locais de sources.yaml no SQLite."""
+"""Crawl manual: fontes locais e git shallow, reindexando só o que mudou."""
 
 import sys
 from pathlib import Path
@@ -12,10 +12,7 @@ from lib.sources import load_sources
 
 
 def main() -> None:
-    sources = [source for source in load_sources() if source["kind"] == "local"]
-    if not sources:
-        raise SystemExit("Nenhuma fonte local em sources.yaml")
-    text, failed = format_reports(index_sources(sources))
+    text, failed = format_reports(index_sources(load_sources()))
     print(text)
     if failed:
         raise SystemExit(1)

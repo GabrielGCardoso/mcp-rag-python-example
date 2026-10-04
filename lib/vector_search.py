@@ -1,8 +1,7 @@
-from typing import Any, TypedDict
+from typing import Any, Callable, TypedDict
 
-from pymongo.collection import Collection
-
-from lib.ollama_client import embed_query
+from lib.embeddings import embed_query as default_embed_query
+from lib.store import load_chunks
 
 
 class StoredEmbedding(TypedDict, total=False):
@@ -61,28 +60,38 @@ def max_marginal_relevance(
     return [
         {
             "pageContent": doc["text"],
-            "metadata": doc.get("metadata") or {},
+            "metadata": {
+                **(doc.get("metadata") or {}),
+                "score": score,
+            },
         }
-        for doc, _ in selected
+        for doc, score in selected
     ]
 
 
 def search_relevant_documents(
-    collection: Collection,
+    conn,
     question: str,
     *,
+    embed_model: str,
+    source_ids: list[str] | None = None,
     fetch_k: int = 20,
     k: int = 4,
     lambda_: float = 0.1,
+    embed_query: Callable[[str], list[float]] | None = None,
 ) -> list[RetrievedDocument]:
-    query_embedding = embed_query(question)
-    docs = list(collection.find({"embedding": {"$exists": True}}))
+    vector = (embed_query or default_embed_query)(question)
+    docs = load_chunks(conn, embed_model, source_ids)
+    if docs and len(docs[0]["embedding"]) != len(vector):
+        raise RuntimeError(
+            "A consulta e o índice têm dimensões diferentes "
+            f"({len(vector)} e {len(docs[0]['embedding'])}). "
+            "O modelo ativo não é o que gravou esses vetores. Rode o crawl de novo."
+        )
 
     scored: list[tuple[StoredEmbedding, float]] = [
-        (doc, cosine_similarity(query_embedding, doc["embedding"]))
-        for doc in docs
+        (doc, cosine_similarity(vector, doc["embedding"])) for doc in docs
     ]
     scored.sort(key=lambda item: item[1], reverse=True)
     scored = scored[:fetch_k]
-
     return max_marginal_relevance(scored, k, lambda_)

@@ -46,4 +46,4 @@ Ficam de fora desta decisão: OAuth, `subscriptions/listen`, tasks, MRTR, e a ex
 - `requirements.txt` fixa `mcp>=2,<3` e mantém `httpx`.
 - Um `tools/list` ou `tools/call` na revisão 2026-07-28 responde com `resultType: complete` e sem header de sessão.
 - O mesmo processo responde ao handshake 2025-11-25.
-- Troca de nomes de tools, crawl e modelos Ollama seguem no `PLANO.md` e não fazem parte desta decisão.
+- Troca de nomes de tools e o crawl seguem no `PLANO.md` e não fazem parte desta decisão. A escolha de modelo, contexto e teto de tokens está na [ADR 0002](0002-escolha-de-modelo.md).

@@ -1,0 +1,5 @@
+sources:
+  - id: fcc-docs
+    kind: local
+    path: fcc_docs
+    include: ["**/*.md"]
