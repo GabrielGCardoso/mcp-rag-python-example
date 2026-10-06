@@ -1,6 +1,6 @@
 import threading
 
-from lib.config import EMBED_BACKEND, LOCAL_EMBED_MODEL, OLLAMA_EMBED_MODEL
+from lib.config import EMBED_BACKEND, LOCAL_EMBED_MODEL, OLLAMA_BASE_URL, OLLAMA_EMBED_MODEL
 from lib.ollama_client import embed_texts as ollama_embed_texts
 
 _NOMIC_DOC = "search_document: "
@@ -12,6 +12,13 @@ _QWEN_QUERY = (
 
 _local_model = None
 _local_lock = threading.Lock()
+
+
+def describe_embed_backend() -> str:
+    model = active_embed_model()
+    if EMBED_BACKEND == "ollama":
+        return f"usando ollama em {OLLAMA_BASE_URL}, modelo {model}"
+    return f"usando embedder local, modelo {model}"
 
 
 def active_embed_model() -> str:

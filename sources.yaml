@@ -3,3 +3,12 @@ sources:
     kind: local
     path: fcc_docs
     include: ["**/*.md"]
+  - id: bff-site-2
+    kind: local
+    path: /home/gabriel/projects/archived/bff-site-2
+    include: ["**/*.md", "**/*.ts"]
+    exclude:
+      - "**/.env"
+      - "**/.env.*"
+      - "**/dist/**"
+      - "**/node_modules/**"

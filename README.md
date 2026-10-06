@@ -53,9 +53,30 @@ O `up` deixa o MCP em `http://localhost:8000/mcp`. O `pull` baixa a tag no servi
 
 Para outra tag, exporte `OLLAMA_EMBED_MODEL` antes do `up` e recrie o `docs-mcp`. O `up` grava essa variável na criação do container. `scripts/pull-docker-ollama-models.sh` faz o `ollama pull`.
 
-### Editor
+### Instalação no editor
 
-O transporte padrão é stdio. O Cursor sobe o processo. Exemplo em [`.vscode/mcp.json`](.vscode/mcp.json):
+O editor fala com o servidor de dois jeitos. O processo é o padrão: o editor sobe o Python. O HTTP usa um servidor que já está escutando, como o do Compose.
+
+<details>
+<summary>Processo (stdio)</summary>
+
+`MCP_TRANSPORT=stdio` é o default. Não há porta. O editor executa `.venv/bin/python server.py` com a pasta do projeto como diretório de trabalho. As tools sobem e descem com a sessão.
+
+Cursor, [`.cursor/mcp.json`](.cursor/mcp.json):
+
+```json
+{
+  "mcpServers": {
+    "docs-mcp": {
+      "type": "stdio",
+      "command": ".venv/bin/python",
+      "args": ["server.py"]
+    }
+  }
+}
+```
+
+VS Code, `.vscode/mcp.json`:
 
 ```json
 {
@@ -69,9 +90,56 @@ O transporte padrão é stdio. O Cursor sobe o processo. Exemplo em [`.vscode/mc
 }
 ```
 
-O diretório de trabalho do servidor precisa ser a pasta do projeto.
+</details>
+
+<details>
+<summary>HTTP</summary>
+
+O servidor precisa estar no ar antes do editor conectar. A URL é `http://localhost:8000/mcp`.
+
+Sem Compose, na pasta do projeto:
+
+```bash
+MCP_TRANSPORT=streamable-http .venv/bin/python server.py
+```
+
+`MCP_HOST` e `MCP_PORT` valem nesse modo. O default é `0.0.0.0:8000`. O Compose já define `MCP_TRANSPORT=streamable-http` e publica a porta 8000.
+
+VS Code, [`.vscode/mcp.json`](.vscode/mcp.json):
+
+```json
+{
+  "servers": {
+    "docs-mcp": {
+      "url": "http://localhost:8000/mcp",
+      "type": "http"
+    }
+  },
+  "inputs": []
+}
+```
+
+Cursor, `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "docs-mcp": {
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+</details>
 
 ## Fontes
+
+`sources.yaml` é a lista do que o crawl indexa. O `scripts/crawl.py` e o servidor leem esse arquivo. `SOURCES_FILE` troca o caminho se o default não servir. Cada item é uma fonte, e o `id` é o nome que `list_sources`, `search` e `read` devolvem.
+
+`kind: local` usa uma pasta que já está no disco. `path` relativo parte da raiz do projeto; absoluto vale do jeito que está. `kind: git` clona `url` em `data/sources/<id>/` na hora do crawl. `branch` fica `main` quando o campo falta. A credencial sai do SSH agent ou de um token no ambiente.
+
+`include` é obrigatório: a lista de globs que entram. `exclude` tira o que o include pegou a mais.
 
 ```yaml
 sources:
@@ -87,7 +155,7 @@ sources:
     exclude: ["**/.git/**", "**/node_modules/**", "**/dist/**", "**/*lock*"]
 ```
 
-O clone git vai para `data/sources/<id>/`. Credencial por SSH agent ou token no ambiente, nunca no YAML. O crawl é manual:
+O crawl é manual:
 
 ```bash
 .venv/bin/python scripts/crawl.py
@@ -95,7 +163,7 @@ O clone git vai para `data/sources/<id>/`. Credencial por SSH agent ou token no 
 
 Arquivo com o mesmo hash e o mesmo modelo de embedding é pulado. Hash novo, modelo novo ou arquivo removido atualiza só aquele path.
 
-O `include` decide o que entra. Markdown usa o splitter de markdown. `.py`, `.js`, `.ts`, `.go`, `.java` e `.rs` usam o splitter da linguagem, com teto de 400 caracteres. O exemplo do repositório indexa só `**/*.md`.
+Markdown entra no splitter de markdown. `.py`, `.js`, `.ts`, `.go`, `.java` e `.rs` entram no splitter da linguagem, com teto de 400 caracteres. Esses arquivos só são indexados se o glob da fonte os listar.
 
 ## Escolher o modelo
 
@@ -211,7 +279,4 @@ Os testes não baixam modelo nem falam com o Ollama. A busca usa vetores fixos.
 
 ## Créditos e referências
 
-Este módulo reutiliza a documentação em `fcc_docs/` e o fluxo RAG do workshop, adaptados do repositório [beaucarnes/vector-search-tutorial](https://github.com/beaucarnes/vector-search-tutorial).
-
-- **Dados e tutorial base:** [github.com/beaucarnes/vector-search-tutorial](https://github.com/beaucarnes/vector-search-tutorial)
-- **Workshop original:** [Let AI Be Your Docs](https://github.com/mongodb-developer/vector-search-workshop)
+Este módulo reutiliza a documentação em `fcc_docs/` [beaucarnes/vector-search-tutorial](https://github.com/beaucarnes/vector-search-tutorial).

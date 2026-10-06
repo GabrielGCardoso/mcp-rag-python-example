@@ -11,11 +11,15 @@ from lib.indexer import format_reports, index_sources
 from lib.sources import load_sources
 
 
+def _progress(message: str) -> None:
+    print(message, flush=True)
+
+
 def main() -> None:
     sources = [source for source in load_sources() if source["kind"] == "local"]
     if not sources:
         raise SystemExit("Nenhuma fonte local em sources.yaml")
-    text, failed = format_reports(index_sources(sources))
+    text, failed = format_reports(index_sources(sources, log=_progress))
     print(text)
     if failed:
         raise SystemExit(1)

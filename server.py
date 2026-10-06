@@ -56,10 +56,10 @@ def search(
 
 @mcp.tool()
 def read(
-    source_id: str,
-    path: str,
+    source_id:  str,        # commit hash
+    path:       str,        # relative path to the root of the source
     start_line: int | None = None,
-    end_line: int | None = None,
+    end_line:   int | None = None,
 ) -> str:
     """Lê um arquivo já clonado ou montado, por source_id e path. Aceita um intervalo de linhas, inclusive."""
     return read_source_text(

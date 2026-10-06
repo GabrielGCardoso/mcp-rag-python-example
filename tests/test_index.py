@@ -102,6 +102,27 @@ class IndexTests(unittest.TestCase):
         self.assertTrue(rows)
         self.assertTrue(all(row["path"] == "alpha.md" for row in rows))
 
+    def test_progress_log_names_each_file(self) -> None:
+        lines: list[str] = []
+        report = index_sources(
+            [self._source()],
+            embed_texts=self.embed,
+            embed_model="test-model",
+            db_path=self.db,
+            data_dir=self.data,
+            log=lines.append,
+        )[0]
+        self.assertIsNone(report.error)
+        self.assertTrue(lines[0].startswith("usando "))
+        self.assertEqual(
+            lines[1:],
+            [
+                "docs: 2 arquivos",
+                "docs: arquivo 1 de 2 alpha.md",
+                "docs: arquivo 2 de 2 beta.md",
+            ],
+        )
+
     def test_search_filters_model_and_source(self) -> None:
         other = self.root / "other"
         other.mkdir()

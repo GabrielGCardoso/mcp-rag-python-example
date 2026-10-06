@@ -1,4 +1,5 @@
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -6,7 +7,11 @@ from pathlib import Path
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from lib.config import CODE_CHUNK_CHARS, DATA_DIR, chunk_chars
-from lib.embeddings import active_embed_model, embed_texts as default_embed_texts
+from lib.embeddings import (
+    active_embed_model,
+    describe_embed_backend,
+    embed_texts as default_embed_texts,
+)
 from lib.sources import iter_files, language_for, source_root, sync_git
 from lib.store import (
     connect,
@@ -67,8 +72,10 @@ def index_sources(
     embed_model: str | None = None,
     db_path: Path | None = None,
     data_dir: Path | None = None,
+    log: Callable[[str], None] | None = None,
 ) -> list[IndexReport]:
     model = embed_model or active_embed_model()
+    _log(log, describe_embed_backend())
     reports: list[IndexReport] = []
     for source in sources:
         reports.append(
@@ -78,9 +85,15 @@ def index_sources(
                 embed_model=model,
                 db_path=db_path,
                 data_dir=data_dir,
+                log=log,
             )
         )
     return reports
+
+
+def _log(log: Callable[[str], None] | None, message: str) -> None:
+    if log is not None:
+        log(message)
 
 
 def _index_source(
@@ -90,6 +103,7 @@ def _index_source(
     embed_model: str,
     db_path: Path | None,
     data_dir: Path | None,
+    log: Callable[[str], None] | None = None,
 ) -> IndexReport:
     source_id = source["id"]
     indexed = 0
@@ -102,16 +116,20 @@ def _index_source(
     try:
         root = source_root(source, data_dir if data_dir is not None else DATA_DIR)
         if source["kind"] == "git":
+            _log(log, f"{source_id}: sincronizando git")
             commit_sha = sync_git(source, root)
 
         files = iter_files(root, source["include"], source["exclude"])
+        total = len(files)
+        _log(log, f"{source_id}: {total} arquivos")
         seen: set[str] = set()
         size = chunk_chars()
 
         with connect(db_path) as conn:
-            for file in files:
+            for position, file in enumerate(files, start=1):
                 rel = file.relative_to(root).as_posix()
                 seen.add(rel)
+                _log(log, f"{source_id}: arquivo {position} de {total} {rel}")
                 try:
                     payload = file.read_bytes()
                     text = payload.decode("utf-8")
@@ -134,7 +152,16 @@ def _index_source(
                 dim = 0
                 if parts:
                     vectors: list[list[float]] = []
-                    for start in range(0, len(parts), BATCH_SIZE):
+                    batch_total = (len(parts) + BATCH_SIZE - 1) // BATCH_SIZE
+                    for batch_number, start in enumerate(
+                        range(0, len(parts), BATCH_SIZE), start=1
+                    ):
+                        if batch_total > 1:
+                            _log(
+                                log,
+                                f"{source_id}: arquivo {position} de {total} {rel} "
+                                f"(lote {batch_number} de {batch_total})",
+                            )
                         batch = parts[start : start + BATCH_SIZE]
                         vectors.extend(embed_texts(batch))
                     if len(vectors) != len(parts):
