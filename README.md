@@ -7,7 +7,6 @@ Servidor MCP que indexa documentação e responde com busca vetorial. O índice 
 | `list_sources` | Fontes, último crawl, commit, contagem de chunks, erro da última rodada |
 | `search` | Trechos parecidos com a consulta (cosseno + MMR), com `source_id`, path e score. Sem LLM |
 | `read` | Abre um arquivo da fonte, inteiro ou num intervalo de linhas |
-| `ask` | Só existe se `OLLAMA_CHAT_MODEL` estiver definido. Busca + redação via Ollama |
 
 Na discovery, quem redige é o modelo do editor. `search` e `read` bastam.
 
@@ -52,7 +51,7 @@ docker compose run --rm docs-mcp python scripts/crawl.py
 
 O `up` deixa o MCP em `http://localhost:8000/mcp`. O `pull` baixa a tag no serviço `ollama`. O `run` indexa `fcc_docs/` nesse volume. Um crawl novo usa o mesmo `OLLAMA_EMBED_MODEL` do servidor. O default é `nomic-embed-text`.
 
-Para outra tag, exporte `OLLAMA_EMBED_MODEL` e `OLLAMA_CHAT_MODEL` antes do `up` e recrie o `docs-mcp`. O `up` grava essas variáveis na criação do container. `scripts/pull-docker-ollama-models.sh` faz o `ollama pull` das duas.
+Para outra tag, exporte `OLLAMA_EMBED_MODEL` antes do `up` e recrie o `docs-mcp`. O `up` grava essa variável na criação do container. `scripts/pull-docker-ollama-models.sh` faz o `ollama pull`.
 
 ### Editor
 
@@ -100,17 +99,17 @@ O `include` decide o que entra. Markdown usa o splitter de markdown. `.py`, `.js
 
 ## Escolher o modelo
 
-Há dois papéis. O embedding é o que a busca usa. O chat entra na tool `ask`, que redige uma resposta a partir dos trechos já recuperados. No editor, quem explora a documentação é o modelo do Cursor.
+O embedding é o que a busca usa. No editor, quem redige a resposta a partir dos trechos é o modelo do Cursor.
 
-O padrão, se você não exportar nada, é o embedder local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. O `fastembed` 0.8 não publica o E5 small; o E5 large pesa 2,2 GB. Este MiniLM cabe em CPU, pesa cerca de 220 MB e cobre português e inglês. A tool `ask` não sobe enquanto `OLLAMA_CHAT_MODEL` estiver vazio.
+O padrão, se você não exportar nada, é o embedder local `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`. O `fastembed` 0.8 não publica o E5 small; o E5 large pesa 2,2 GB. Este MiniLM cabe em CPU, pesa cerca de 220 MB e cobre português e inglês.
 
-`EMBED_BACKEND=ollama` usa o Ollama que já estiver em `OLLAMA_BASE_URL` (o binário nativo, ou o serviço do Compose). Aí a tag vem de `OLLAMA_EMBED_MODEL`. O par citado abaixo, `nomic-embed-text` e `llama3.2:3b`, é o ponto de partida desse backend para o `fcc_docs/` atual: markdown curto, em inglês. Para português, código ou arquivo longo, os perfis trocam a tag sem mudar código.
+`EMBED_BACKEND=ollama` usa o Ollama que já estiver em `OLLAMA_BASE_URL` (o binário nativo, ou o serviço do Compose). Aí a tag vem de `OLLAMA_EMBED_MODEL`. `nomic-embed-text` é o ponto de partida desse backend para o `fcc_docs/` atual: markdown curto, em inglês. Para português, código ou arquivo longo, os perfis trocam a tag sem mudar código.
 
 Trocar o modelo de embedding muda a dimensão do vetor. Rode o crawl de novo. Uma busca só lê vetores gravados com o modelo ativo.
 
-O contexto da coluna é a janela publicada da tag. `EMBED_NUM_CTX` limita o quanto entra em cada trecho (em tokens; o splitter usa cerca de 4 caracteres por token). `OLLAMA_NUM_CTX` é a janela do chat. `OLLAMA_NUM_PREDICT` é o teto de tokens da resposta. Sem essas variáveis, o chunk fica em 500 caracteres e o Ollama usa o default da tag. A decisão está em [docs/adr/0002-escolha-de-modelo.md](docs/adr/0002-escolha-de-modelo.md).
+O contexto da coluna é a janela publicada da tag. `EMBED_NUM_CTX` limita o quanto entra em cada trecho (em tokens; o splitter usa cerca de 4 caracteres por token). Sem essa variável, o chunk fica em 500 caracteres. A decisão está em [docs/adr/0002-escolha-de-modelo.md](docs/adr/0002-escolha-de-modelo.md).
 
-Fontes das fichas: [qwen3-embedding](https://ollama.com/library/qwen3-embedding), [nomic-embed-text](https://ollama.com/library/nomic-embed-text), [qwen3](https://ollama.com/library/qwen3).
+Fontes das fichas: [qwen3-embedding](https://ollama.com/library/qwen3-embedding), [nomic-embed-text](https://ollama.com/library/nomic-embed-text).
 
 ### Embedding
 
@@ -125,19 +124,6 @@ Fontes das fichas: [qwen3-embedding](https://ollama.com/library/qwen3-embedding)
 `embeddinggemma` (cerca de 622 MB, contexto 2048) fica de fora: a janela curta corta arquivo de código e README longo.
 
 No backend Ollama, o cliente aplica `search_query:` / `search_document:` no `nomic-embed-text`, e a instrução de retrieval na consulta do `qwen3-embedding`.
-
-### Chat
-
-Só importa se `OLLAMA_CHAT_MODEL` estiver definido.
-
-| Tag | Tamanho | Contexto | Melhor quando |
-| --- | --- | --- | --- |
-| `llama3.2:3b` | 2,0 GB | 128K | `ask` em inglês, no corpus atual. |
-| `qwen3:1.7b` | 1,4 GB | 40K | A máquina já roda embedding e sobra pouca RAM. |
-| `qwen3:4b` | 2,5 GB | 256K | Resposta em português sobre trechos já buscados, sem GPU dedicada. |
-| `qwen3:8b` | 5,2 GB | 40K | A resposta redigida localmente precisa de mais qualidade e a RAM cobre o peso. |
-
-O cliente de chat envia `num_gpu: 0`, então o modelo de chat precisa caber na RAM mesmo que a máquina tenha GPU. O embedding do Ollama usa o que o serviço tiver disponível.
 
 ### Comandos
 
@@ -156,9 +142,7 @@ Português, código ou arquivo longo, máquina de trabalho sem GPU. Trocar a tag
 ```bash
 export EMBED_BACKEND=ollama
 export OLLAMA_EMBED_MODEL=qwen3-embedding:0.6b
-export OLLAMA_CHAT_MODEL=qwen3:4b
 ollama pull "$OLLAMA_EMBED_MODEL"
-ollama pull "$OLLAMA_CHAT_MODEL"
 .venv/bin/python scripts/crawl.py
 ```
 
@@ -167,20 +151,11 @@ Mais qualidade, com RAM para os pesos maiores:
 ```bash
 export EMBED_BACKEND=ollama
 export OLLAMA_EMBED_MODEL=qwen3-embedding:4b
-export OLLAMA_CHAT_MODEL=qwen3:8b
 ollama pull "$OLLAMA_EMBED_MODEL"
-ollama pull "$OLLAMA_CHAT_MODEL"
 .venv/bin/python scripts/crawl.py
 ```
 
-Trocar só o chat dispensa o crawl. Exemplo, mantendo o embedding local e ligando o `ask`:
-
-```bash
-export OLLAMA_CHAT_MODEL=qwen3:4b
-ollama pull "$OLLAMA_CHAT_MODEL"
-```
-
-Para fixar o par entre sessões, grave as variáveis no `.env` (a partir de [`.env.example`](.env.example)).
+Para fixar a tag entre sessões, grave as variáveis no `.env` (a partir de [`.env.example`](.env.example)).
 
 ## Variáveis de ambiente
 
@@ -192,10 +167,7 @@ Para fixar o par entre sessões, grave as variáveis no `.env` (a partir de [`.e
 | `SOURCES_FILE` | `sources.yaml` | Lista de fontes |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama nativo ou do Compose |
 | `OLLAMA_EMBED_MODEL` | `nomic-embed-text` | Tag quando o backend é `ollama` |
-| `OLLAMA_CHAT_MODEL` | vazio | Vazio não registra `ask` |
 | `EMBED_NUM_CTX` | vazio | Tokens por trecho. Vazio = chunk de 500 caracteres |
-| `OLLAMA_NUM_CTX` | vazio | Janela do chat |
-| `OLLAMA_NUM_PREDICT` | vazio | Teto de tokens da resposta |
 | `MCP_TRANSPORT` | `stdio` | `stdio` ou `streamable-http` |
 
 ## HTTP opcional
@@ -218,7 +190,7 @@ curl -s -X POST "$MCP" \
 
 ```
 vector-search/
-├── server.py              # MCP: list_sources, search, read, ask
+├── server.py              # MCP: list_sources, search, read
 ├── sources.yaml           # fontes locais e git
 ├── lib/                   # SQLite, crawl, embedding, busca
 ├── scripts/

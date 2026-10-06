@@ -37,11 +37,8 @@ DATA_DIR = _path_env("DATA_DIR", "data")
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 OLLAMA_EMBED_MODEL = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text").strip()
-OLLAMA_CHAT_MODEL = os.environ.get("OLLAMA_CHAT_MODEL", "").strip()
 
 EMBED_NUM_CTX = _optional_int("EMBED_NUM_CTX")
-OLLAMA_NUM_CTX = _optional_int("OLLAMA_NUM_CTX")
-OLLAMA_NUM_PREDICT = _optional_int("OLLAMA_NUM_PREDICT")
 
 DEFAULT_CHUNK_CHARS = 500
 CODE_CHUNK_CHARS = 400
@@ -51,7 +48,3 @@ def chunk_chars() -> int:
     if EMBED_NUM_CTX is None:
         return DEFAULT_CHUNK_CHARS
     return max(EMBED_NUM_CTX * 4, 32)
-
-
-def chat_enabled() -> bool:
-    return bool(OLLAMA_CHAT_MODEL)

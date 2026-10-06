@@ -1,24 +1,13 @@
-import json
 import os
 
 from mcp.server.mcpserver import MCPServer
 
-from lib.config import chat_enabled
 from lib.embeddings import active_embed_model
 from lib.sources import load_sources, read_source_text
 from lib.store import chunk_counts, connect, source_rows
 from lib.vector_search import RetrievedDocument, search_relevant_documents
 
 mcp = MCPServer("docs-mcp")
-
-RAG_PROMPT = (
-    "Responda a pergunta usando somente os trechos abaixo, em markdown. "
-    "Se a resposta não estiver nos trechos, diga que não sabe.\n\n"
-    "Trechos:\n"
-    "{context}\n\n"
-    "Pergunta:\n"
-    "{question}\n"
-)
 
 
 @mcp.tool()
@@ -79,25 +68,6 @@ def read(
         start_line=start_line,
         end_line=end_line,
     )
-
-
-if chat_enabled():
-    from lib.ollama_client import chat
-
-    @mcp.tool()
-    def ask(query: str) -> str:
-        """Busca trechos e redige uma resposta com o modelo de chat configurado."""
-        with connect() as conn:
-            context = search_relevant_documents(
-                conn,
-                query,
-                embed_model=active_embed_model(),
-            )
-        prompt = RAG_PROMPT.format(
-            context=json.dumps(context, ensure_ascii=False),
-            question=query,
-        )
-        return chat(prompt)
 
 
 if __name__ == "__main__":
