@@ -1,8 +1,9 @@
 import os
+import sys
 
 from mcp.server.mcpserver import MCPServer
 
-from lib.embeddings import active_embed_model
+from lib.embeddings import active_embed_model, describe_embed_backend
 from lib.sources import load_sources, read_source_text
 from lib.store import chunk_counts, connect, source_rows
 from lib.vector_search import RetrievedDocument, search_relevant_documents
@@ -72,6 +73,7 @@ def read(
 
 if __name__ == "__main__":
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    print(f"docs-mcp: {describe_embed_backend()}", file=sys.stderr, flush=True)
     if transport == "stdio":
         mcp.run(transport="stdio")
     else:
